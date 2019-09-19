@@ -2,6 +2,8 @@
 COL870 A1 Code
 """
 
+from collections import defaultdict
+
 from numpy.random import choice, randint
 
 
@@ -22,31 +24,20 @@ def print_card(player, sign, number):
             print("Dealer R"+str(number))
 
 
-def score_state(state_to_score):
+def score_state(state_obj):
     """
-    Score states for player and dealer
+    Score state object
     """
-    player_total = state_to_score['player_total']
-    player_trumps = state_to_score['player_trump1'] + \
-        state_to_score['player_trump2'] + state_to_score['player_trump3']
+    total = state_obj['total']
+    trumps = state_obj['trump1'] + state_obj['trump2'] + state_obj['trump3']
 
-    player_score_loc = 0
-    for num_trumps in range(player_trumps, -1, -1):
-        player_score_loc = player_total + num_trumps * 10
-        if player_score_loc <= 31:
+    score = 0
+    for num_trumps in range(trumps, -1, -1):
+        score = total + num_trumps * 10
+        if score <= 31:
             break
 
-    dealer_total = state_to_score['dealer_total']
-    dealer_trumps = state_to_score['dealer_trump1'] + \
-        state_to_score['dealer_trump2'] + state_to_score['dealer_trump3']
-
-    dealer_score = 0
-    for num_trumps in range(dealer_trumps, -1, -1):
-        dealer_score = dealer_total + num_trumps * 10
-        if dealer_score <= 31:
-            break
-
-    return player_score_loc, dealer_score
+    return score
 
 
 def generate_random_b_r():
@@ -83,34 +74,29 @@ class Simulator():
         self.encoder = {}
         self.decoder = {}
 
-        for player_total in range(-30, 32):
-            for dealer_total in range(-30, 32):
-                for p_t1 in range(0, 2):
-                    for p_t2 in range(0, 2):
-                        for p_t3 in range(0, 2):
-                            for d_t1 in range(0, 2):
-                                for d_t2 in range(0, 2):
-                                    for d_t3 in range(0, 2):
-                                        constructed_state = {
-                                            'player_total': player_total,
-                                            'player_trump1': p_t1,
-                                            'player_trump2': p_t2,
-                                            'player_trump3': p_t3,
-                                            'dealer_total': dealer_total,
-                                            'dealer_trump1': d_t1,
-                                            'dealer_trump2': d_t2,
-                                            'dealer_trump3': d_t3,
-                                        }
-                                        player_score_loc, dealer_score = score_state(
-                                            constructed_state)
+        for total in range(-30, 32):
+            for dealer_card in range(1, 11):
+                for t1_val in range(0, 2):
+                    for t2_val in range(0, 2):
+                        for t3_val in range(0, 2):
 
-                                        if not (0 <= player_score_loc <= 31 and 0 <= dealer_score <= 31):
-                                            continue
+                            constructed_state = {
+                                'total': total,
+                                'trump1': t1_val,
+                                'trump2': t2_val,
+                                'trump3': t3_val,
+                                'dealer_card': dealer_card,
+                            }
 
-                                        self.encoder[frozenset(
-                                            constructed_state.items())] = state_num
-                                        self.decoder[state_num] = constructed_state
-                                        state_num += 1
+                            player_score_loc = score_state(constructed_state)
+
+                            if not 0 <= player_score_loc <= 31:
+                                continue
+
+                            self.encoder[frozenset(
+                                constructed_state.items())] = state_num
+                            self.decoder[state_num] = constructed_state
+                            state_num += 1
 
         print('total_states = ', state_num)
 
@@ -118,10 +104,13 @@ class Simulator():
         """
         Encode input state
         """
+
         if type_state == 'lose':
             return 0
+
         if type_state == 'win':
             return 1
+
         if type_state == 'draw':
             return 2
 
@@ -131,176 +120,172 @@ class Simulator():
         """
         Decode input state
         """
+
         if state_num == 0:
             return 'lose'
+
         if state_num == 1:
             return 'win'
+
         if state_num == 2:
             return 'draw'
 
         return self.decoder[state_num]
 
-    def check_and_return_next_state(self, state, end_game=False):
-        """
-        Check the scores and continue game if possible
-        """
-        player_score_loc, dealer_score = score_state(state)
-
-        done_loc = False
-
-        if not 0 <= player_score_loc <= 31 and not 0 <= dealer_score <= 31:
-            next_state_loc, reward_loc, done_loc = self.encode('draw'), 0, True
-
-        if player_score_loc < 0 or player_score_loc > 31:
-            next_state_loc, reward_loc, done_loc = self.encode(
-                'lose'), -1, True
-
-        if dealer_score < 0 or dealer_score > 31:
-            next_state_loc, reward_loc, done_loc = self.encode('win'), 1, True
-
-        if end_game and not done_loc:
-            if player_score_loc > dealer_score:
-                next_state_loc, reward_loc, done_loc = self.encode(
-                    'win'), 1, True
-
-            if player_score_loc == dealer_score:
-                next_state_loc, reward_loc, done_loc = self.encode(
-                    'draw'), 0, True
-
-            if player_score_loc < dealer_score:
-                next_state_loc, reward_loc, done_loc = self.encode(
-                    'lose'), -1, True
-
-        if not done_loc:
-            next_state_loc, reward_loc, done_loc = self.encode(), 0, False
-
-        return next_state_loc, reward_loc, done_loc
-
     def reset(self):
         """
         Reset State and start new game
         """
+
         self.state = {
-            'player_total': 0,
-            'player_trump1': 0,
-            'player_trump2': 0,
-            'player_trump3': 0,
-            'dealer_total': 0,
-            'dealer_trump1': 0,
-            'dealer_trump2': 0,
-            'dealer_trump3': 0,
+            'total': 0,
+            'trump1': 0,
+            'trump2': 0,
+            'trump3': 0,
+            'dealer_card': 0,
         }
 
         card_num = generate_random_number()
 
-        self.state['player_total'] = card_num
-        if card_num == 1:
-            self.state['player_trump1'] = 1
-        elif card_num == 2:
-            self.state['player_trump2'] = 1
-        elif card_num == 3:
-            self.state['player_trump3'] = 1
+        self.state['total'] = card_num
+        if card_num in [1, 2, 3]:
+            self.state['trump'+str(card_num)] = 1
 
         # print_card(True, '+', card_num)
 
         card_num = generate_random_number()
 
-        self.state['dealer_total'] = card_num
-        if card_num == 1:
-            self.state['dealer_trump1'] = 1
-        elif card_num == 2:
-            self.state['dealer_trump2'] = 1
-        elif card_num == 3:
-            self.state['dealer_trump3'] = 1
+        self.state['dealer_card'] = card_num
 
         # print_card(False, '+', card_num)
-
-        init_state_loc, _, _ = self.check_and_return_next_state(self.state)
-        return init_state_loc
+        return self.encode(self.state)
 
     def step(self, action_taken):
         """
         Take next step according to action
         """
+
         if action_taken == 'hit':
             card_sign = generate_random_b_r()
             card_num = generate_random_number()
 
             if card_sign == '+':
-                self.state['player_total'] += card_num
-                if card_num == 1:
-                    self.state['player_trump1'] = 1
-                elif card_num == 2:
-                    self.state['player_trump2'] = 1
-                elif card_num == 3:
-                    self.state['player_trump3'] = 1
+                self.state['total'] += card_num
+                if card_num in [1, 2, 3]:
+                    self.state['trump'+str(card_num)] = 1
             else:
-                self.state['player_total'] -= card_num
+                self.state['total'] -= card_num
+
+            score = score_state(self.state)
+
+            if not 0 <= score <= 31:
+                return self.encode('lose'), -1, True
+
+            return self.encode(), 0, False
 
             # print_card(True, card_sign, card_num)
 
+        ## Action = 'Stick'
+
+        dealer_card = self.state['dealer_card']
+
+        dealer_state = {
+            'total': dealer_card,
+            'trump1': 0,
+            'trump2': 0,
+            'trump3': 0
+        }
+
+        if dealer_card in [1, 2, 3]:
+            dealer_state['trump'+str(dealer_card)] = 1
+
+        score = score_state(self.state)
+        dealer_score = score_state(dealer_state)
+
+        while 0 <= dealer_score < 24:
+            card_sign = generate_random_b_r()
+            card_num = generate_random_number()
+
+            if card_sign == '+':
+                dealer_state['total'] += card_num
+                if card_num in [1, 2, 3]:
+                    dealer_state['trump'+str(card_num)] = 1
+            else:
+                dealer_state['total'] -= card_num
+
+            # print_card(False, card_sign, card_num)
+
+            dealer_score = score_state(dealer_state)
+
+            # print('Projected Scores', player_score, dealer_score)
+
+        if (not 0 <= dealer_score <= 31) or (dealer_score < score):
+            return self.encode('win'), 1, True
+
+        if dealer_score > score:
+            return self.encode('lose'), -1, True
+
+        if dealer_score == score:
+            return self.encode('draw'), 0, True
+
+
+def generate_episode_q_value(simulator):
+    """
+    Generate episodes according to simple policy in state action tuples
+    """
+    state = simulator.reset()
+    done = False
+    state_action_pairs = []
+    rewards = []
+
+    while not done:
+        decoded_state = simulator.decode(state)
+        player_score = score_state(decoded_state)
+
+        if player_score < 25:
+            action = 'hit'
         else:
-            while True:
-                card_sign = generate_random_b_r()
-                card_num = generate_random_number()
+            action = 'stick'
 
-                if card_sign == '+':
-                    self.state['dealer_total'] += card_num
-                    if card_num == 1:
-                        self.state['dealer_trump1'] = 1
-                    elif card_num == 2:
-                        self.state['dealer_trump2'] = 1
-                    elif card_num == 3:
-                        self.state['dealer_trump3'] = 1
-                else:
-                    self.state['dealer_total'] -= card_num
+        state_action_pairs.append((state, action))
 
-                # print_card(False, card_sign, card_num)
+        state, reward, done = simulator.step(action)
 
-                _, dealer_score = score_state(self.state)
+        rewards.append(reward)
 
-                # print('Projected Scores', player_score, dealer_score)
+    return state_action_pairs, rewards
 
-                if(dealer_score < 0 or dealer_score > 31) or dealer_score >= 25:
-                    break
 
-        next_state_loc, reward_loc, done_loc = self.check_and_return_next_state(
-            self.state, action_taken != 'hit')
+def average(lst):
+    """
+    Find average of elements of list
+    """
+    return sum(lst) / len(lst)
 
-        return next_state_loc, reward_loc, done_loc
+
+def run_mc_q_value(simulator, gamma, visit_type):
+    """
+    Run Monte Carlo method for finding Q values
+    """
+    q_val = {'hit': defaultdict(lambda: 0), 'stick': defaultdict(lambda: 0)}
+    returns = {'hit': defaultdict(
+        lambda: []), 'stick': defaultdict(lambda: [])}
+
+    for _ in range(10000):
+        state_action_pairs, reward = generate_episode_q_value(simulator)
+        g_val = 0
+        for ind, state_action in enumerate(state_action_pairs):
+            g_val = reward[ind] + gamma * g_val
+
+            if visit_type == 'every' or (state_action not in state_action_pairs[:ind-1]):
+                returns[state_action[1]][state_action[0]].append(g_val)
+                q_val[state_action[1]][state_action[0]] = average(
+                    returns[state_action[1]][state_action[0]])
+
+    return q_val
 
 
 if __name__ == "__main__":
-    EPISODES = []
     SIM = Simulator()
-
-    for i in range(10):
-        episode = []
-
-        init_state = SIM.reset()
-        episode.append(init_state)
-        decoded_state = SIM.decode(init_state)
-        # print(DECODED_STATE)
-        # print('Projected Scores', score_state(DECODED_STATE))
-        done = False
-        action = 'none'
-        while not done:
-            player_score, _ = score_state(decoded_state)
-
-            if player_score < 25:
-                action = 'hit'
-                next_state, reward, done = SIM.step('hit')
-            else:
-                action = 'stick'
-                next_state, reward, done = SIM.step('stick')
-            decoded_state = SIM.decode(next_state)
-            episode.append(action)
-            episode.append(reward)
-            episode.append(next_state)
-            # print(DECODED_STATE, REWARD, DONE)
-            # if not DONE:
-            # print('Projected Scores', score_state(DECODED_STATE))
-        print((len(episode)-1) / 3)
-        EPISODES.append(episode)
-
-    print(EPISODES)
+    Q_FUNCTION = run_mc_q_value(SIM, 0, 'first')
+    print(Q_FUNCTION)
