@@ -197,7 +197,7 @@ class Simulator():
         elif card_num == 3:
             self.state['player_trump3'] = 1
 
-        print_card(True, '+', card_num)
+        # print_card(True, '+', card_num)
 
         card_num = generate_random_number()
 
@@ -209,7 +209,7 @@ class Simulator():
         elif card_num == 3:
             self.state['dealer_trump3'] = 1
 
-        print_card(False, '+', card_num)
+        # print_card(False, '+', card_num)
 
         init_state_loc, _, _ = self.check_and_return_next_state(self.state)
         return init_state_loc
@@ -233,7 +233,7 @@ class Simulator():
             else:
                 self.state['player_total'] -= card_num
 
-            print_card(True, card_sign, card_num)
+            # print_card(True, card_sign, card_num)
 
         else:
             while True:
@@ -251,11 +251,11 @@ class Simulator():
                 else:
                     self.state['dealer_total'] -= card_num
 
-                print_card(False, card_sign, card_num)
+                # print_card(False, card_sign, card_num)
 
                 player_score, dealer_score = score_state(self.state)
 
-                print('Projected Scores', player_score, dealer_score)
+                # print('Projected Scores', player_score, dealer_score)
 
                 if(dealer_score < 0 or dealer_score > 31) or dealer_score >= 25:
                     break
@@ -266,19 +266,36 @@ class Simulator():
         return next_state, reward, done
 
 
+episodes = []
 SIM = Simulator()
-INIT_STATE = SIM.reset()
-DECODED_STATE = SIM.decode(INIT_STATE)
-print(DECODED_STATE)
-print('Projected Scores', score_state(DECODED_STATE))
-DONE = False
-while not DONE:
-    PLAYER_SCORE, _ = score_state(DECODED_STATE)
-    if PLAYER_SCORE < 25:
-        NEXT_STATE, REWARD, DONE = SIM.step('hit')
-    else:
-        NEXT_STATE, REWARD, DONE = SIM.step('stick')
-    DECODED_STATE = SIM.decode(NEXT_STATE)
-    print(DECODED_STATE, REWARD, DONE)
-    if not DONE:
-        print('Projected Scores', score_state(DECODED_STATE))
+
+for i in range(10):
+    episode = []
+
+    INIT_STATE = SIM.reset()
+    episode.append(INIT_STATE)
+    DECODED_STATE = SIM.decode(INIT_STATE)
+    # print(DECODED_STATE)
+    # print('Projected Scores', score_state(DECODED_STATE))
+    DONE = False
+    ACTION = 'none'
+    while not DONE:
+        PLAYER_SCORE, _ = score_state(DECODED_STATE)
+
+        if PLAYER_SCORE < 25:
+            ACTION = 'hit'
+            NEXT_STATE, REWARD, DONE = SIM.step('hit')
+        else:
+            ACTION = 'stick'
+            NEXT_STATE, REWARD, DONE = SIM.step('stick')
+        DECODED_STATE = SIM.decode(NEXT_STATE)
+        episode.append(ACTION)
+        episode.append(REWARD)
+        episode.append(NEXT_STATE)
+        # print(DECODED_STATE, REWARD, DONE)
+        # if not DONE:
+        # print('Projected Scores', score_state(DECODED_STATE))
+    print((len(episode)-1) / 3)
+    episodes.append(episode)
+
+print(episodes)
