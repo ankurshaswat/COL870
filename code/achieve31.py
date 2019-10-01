@@ -26,6 +26,18 @@ def print_card(player, sign, number):
             print("Dealer R"+str(number))
 
 
+def score_compressed_state(total, trumps):
+    """
+    Calculate score from compressed state
+    """
+    score = 0
+    for num_trumps in range(trumps, -1, -1):
+        score = total + num_trumps * 10
+        if score <= 31:
+            break
+    return score
+
+
 def score_state(state_obj):
     """
     Score state object
@@ -33,13 +45,7 @@ def score_state(state_obj):
     total = state_obj['total']
     trumps = state_obj['trump1'] + state_obj['trump2'] + state_obj['trump3']
 
-    score = 0
-    for num_trumps in range(trumps, -1, -1):
-        score = total + num_trumps * 10
-        if score <= 31:
-            break
-
-    return score
+    return score_compressed_state(total, trumps)
 
 
 def generate_random_b_r():
@@ -61,6 +67,19 @@ def generate_random_number():
     return draw
 
 
+def compress_state(state):
+    """
+    Compress state to combine special cards
+    """
+    compressed_state = {
+        'total': state['total'],
+        'trumps': state['trump1'] + state['trump2'] + state['trump3'],
+        'dealer_card': state['dealer_card']
+    }
+
+    return compressed_state
+
+
 class Simulator():
     """
     Class to simulate Achieve31 Games
@@ -80,31 +99,26 @@ class Simulator():
         # self.decoder = {}
         self.decode_score = {}
 
-        for total in range(-30, 1+31):
-            for dealer_card in range(1, 1+10):
-                for t1_val in range(0, 2):
-                    for t2_val in range(0, 2):
-                        for t3_val in range(0, 2):
+        for total in range(-30, 32):
+            for dealer_card in range(1, 11):
+                for trumps in range(0, 4):
+                    compressed_state = {
+                        'total': total,
+                        'trumps': trumps,
+                        'dealer_card': dealer_card
+                    }
 
-                            constructed_state = {
-                                'total': total,
-                                'trump1': t1_val,
-                                'trump2': t2_val,
-                                'trump3': t3_val,
-                                'dealer_card': dealer_card,
-                            }
+                    player_score_loc = score_compressed_state(total, trumps)
 
-                            player_score_loc = score_state(constructed_state)
+                    if not 0 <= player_score_loc <= 31:
+                        continue
 
-                            if not 0 <= player_score_loc <= 31:
-                                continue
+                    self.encoder[frozenset(
+                        compressed_state.items())] = state_num
+                    # self.decoder[state_num] = constructed_state
+                    self.decode_score[state_num] = player_score_loc
 
-                            self.encoder[frozenset(
-                                constructed_state.items())] = state_num
-                            # self.decoder[state_num] = constructed_state
-                            self.decode_score[state_num] = player_score_loc
-
-                            state_num += 1
+                    state_num += 1
 
         self.num_states = state_num
 
@@ -130,7 +144,9 @@ class Simulator():
         if type_state == 'draw':
             return 2
 
-        return self.encoder[frozenset(state.items())]
+        compressed_state = compress_state(state)
+
+        return self.encoder[frozenset(compressed_state.items())]
 
     def get_state_score(self, state_num):
         """
@@ -468,7 +484,7 @@ def save_q_val_function(name, q_func, num_states):
     """
     Function to save q value function obtained after much calculation
     """
-    with open('saves/'+name+'_'+str(int(time.time())), 'w') as file:
+    with open('../saves/'+name+'_'+str(int(time.time())), 'w') as file:
         for action in ['hit', 'stick']:
             file.write(action+'\n')
             for state_num in trange(num_states):
