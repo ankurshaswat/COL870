@@ -2,11 +2,10 @@
 COL870 A1 Code
 """
 
+import os
 import time
 from collections import defaultdict
 from random import choice, randint, random
-
-from tqdm import trange
 
 
 def print_card(player, sign, number):
@@ -53,8 +52,6 @@ def generate_random_b_r():
     Generate Random Card type
     """
     draw = choice(['+', '+', '-'])
-    # draw = choices(['+', '-'], weights=[2/3, 1/3])[0]
-    # draw = choice(['+', '-'], 1, p=[2/3, 1/3])
     return draw
 
 
@@ -62,7 +59,6 @@ def generate_random_number():
     """
     Generate Random Next Card Number
     """
-    # draw = randint(low=1, high=11)
     draw = randint(1, 10)
     return draw
 
@@ -121,8 +117,7 @@ class Simulator():
                     state_num += 1
 
         self.num_states = state_num
-
-        print('total_states = ', state_num)
+        # print('total_states = ', state_num)
 
     def get_num_states(self):
         """
@@ -157,6 +152,7 @@ class Simulator():
             return None
 
         return self.decode_score[state_num]
+
     # def decode(self, state_num):
     #     """
     #     Decode input state
@@ -220,10 +216,9 @@ class Simulator():
             score = score_state(self.state)
 
             if not 0 <= score <= 31:
-                return self.encode(self.state, 'lose'), -1, True
+                return self.encode(None, 'lose'), -1, True
 
-            if 0 <= score <= 31:
-                return self.encode(self.state), 0, False
+            return self.encode(self.state), 0, False
 
             # print_card(True, card_sign, card_num)
 
@@ -262,13 +257,13 @@ class Simulator():
             # print('Projected Scores', player_score, dealer_score)
 
         if (not 0 <= dealer_score <= 31) or (dealer_score < score):
-            return self.encode(self.state, 'win'), 1, True
+            return self.encode(None, 'win'), 1, True
 
         if dealer_score > score:
-            return self.encode(self.state, 'lose'), -1, True
+            return self.encode(None, 'lose'), -1, True
 
         if dealer_score == score:
-            return self.encode(self.state, 'draw'), 0, True
+            return self.encode(None, 'draw'), 0, True
 
 
 def generate_episode_q_value(simulator):
@@ -313,7 +308,7 @@ def run_mc_q_value(simulator, gamma, visit_type, num_episodes):
     returns = {'hit': defaultdict(
         lambda: []), 'stick': defaultdict(lambda: [])}
 
-    for _ in trange(num_episodes):
+    for _ in range(num_episodes):
         state_action_pairs, reward = generate_episode_q_value(simulator)
         g_val = 0
         for ind, state_action in reversed(list(enumerate(state_action_pairs))):
@@ -327,13 +322,13 @@ def run_mc_q_value(simulator, gamma, visit_type, num_episodes):
     return q_val
 
 
-def run_k_step_td_q_value(simulator, k, alpha, gamma):
+def run_k_step_td_q_value(simulator, k, alpha, gamma, num_epis):
     """
     Run k step TD method for finding Q values
     """
     q_val = {'hit': defaultdict(lambda: 0), 'stick': defaultdict(lambda: 0)}
 
-    for _ in range(10000):
+    for _ in range(num_epis):
 
         state = simulator.reset()
 
@@ -342,7 +337,6 @@ def run_k_step_td_q_value(simulator, k, alpha, gamma):
         t_actual = 0
         done = False
 
-        # decoded_state = simulator.decode(state)
         player_score = simulator.get_state_score(state)
 
         if player_score < 25:
@@ -364,7 +358,7 @@ def run_k_step_td_q_value(simulator, k, alpha, gamma):
                     t_terminal = t_actual + 1
                 else:
                     t_terminal += 1
-                    # decoded_state = simulator.decode(state)
+
                     player_score = simulator.get_state_score(state)
 
                     if player_score < 25:
@@ -394,11 +388,15 @@ def run_k_step_td_q_value(simulator, k, alpha, gamma):
                 q_val[temp_action][temp_state] = old_q + \
                     alpha * (g_value - old_q)
 
-            t_actual += 1
+            if t_apparent < 0 and t_actual >= t_terminal:
+                t_actual = k-1
+            else:
+                t_actual += 1
+
     return q_val
 
 
-def k_step_lookahed_sarsa(simulator, k, alpha, epsilon, gamma, num_epis):
+def k_step_lookahed_sarsa(simulator, k, init_alpha, epsilon, gamma, num_epis, decay=False):
     """
     Simulate k step lookahead SARSA
     """
@@ -407,8 +405,12 @@ def k_step_lookahed_sarsa(simulator, k, alpha, epsilon, gamma, num_epis):
 
     all_final_rewards = []
 
-    for _ in trange(num_epis):
+    num_updates = 0
+
+    for _ in range(num_epis):
         state = simulator.reset()
+
+        alpha = init_alpha
 
         greedy_action = greedy_pi[state]
 
@@ -432,16 +434,19 @@ def k_step_lookahed_sarsa(simulator, k, alpha, epsilon, gamma, num_epis):
                 states.append(state)
                 rewards.append(reward)
                 if done:
-                    all_final_rewards.append(reward)
                     t_terminal = t_actual + 1
                 else:
                     t_terminal += 1
                     # decoded_state = simulator.decode(state)
-                    greedy_action = greedy_pi[state]
+                    state_score = simulator.get_state_score(state)
 
-                    action = greedy_action
-                    if random() < epsilon:
-                        action = choice(['hit', 'stick'])
+                    if state_score == 31:
+                        action = 'stick'
+                    else:
+                        greedy_action = greedy_pi[state]
+                        action = greedy_action
+                        if random() < epsilon:
+                            action = choice(['hit', 'stick'])
 
                     actions.append(action)
 
@@ -462,6 +467,11 @@ def k_step_lookahed_sarsa(simulator, k, alpha, epsilon, gamma, num_epis):
                 temp_state = states[t_apparent]
                 temp_action = actions[t_apparent]
                 old_q = q_val[temp_action][temp_state]
+
+                if decay:
+                    num_updates += 1
+                    alpha = init_alpha / num_updates
+
                 q_val[temp_action][temp_state] = old_q + \
                     alpha * (g_value - old_q)
 
@@ -475,19 +485,78 @@ def k_step_lookahed_sarsa(simulator, k, alpha, epsilon, gamma, num_epis):
                 else:
                     greedy_pi[temp_state] = 'hit'
 
-            t_actual += 1
+            if t_apparent < 0 and t_actual >= t_terminal:
+                t_actual = k-1
+            else:
+                t_actual += 1
+
+        all_final_rewards.append(reward)
 
     return greedy_pi, all_final_rewards
+
+
+def epsilon_greedy_sample(q_func, simulator, epsilon, state):
+    """
+    Sample action based on epsilon greedy policy
+    """
+    state_score = simulator.get_state_score(state)
+
+    if state_score == 31:
+        action = 'stick'
+    else:
+        if q_func['hit'][state] >= q_func['stick'][state]:
+            action = 'hit'
+        else:
+            action = 'stick'
+        # greedy_action = greedy_pi[state]
+        # action = greedy_action
+        if random() < epsilon:
+            action = choice(['hit', 'stick'])
+
+    return action
+
+
+def q_learning(simulator, alpha, epsilon, gamma, num_epis):
+    """
+    Q learning with epsilon greedy policy
+    """
+    q_val = {'hit': defaultdict(lambda: 0), 'stick': defaultdict(lambda: 0)}
+    # greedy_pi = defaultdict(lambda: 'hit')
+
+    all_final_rewards = []
+
+    for _ in range(num_epis):
+        state = simulator.reset()
+
+        done = False
+
+        while not done:
+            action = epsilon_greedy_sample(
+                q_val, simulator, epsilon, state)
+
+            next_state, reward, done = simulator.step(action)
+
+            q_val[action][state] = q_val[action][state] + alpha*(reward + gamma*max(
+                q_val['hit'][next_state], q_val['stick'][next_state])-q_val[action][state])
+
+            state = next_state
+
+        all_final_rewards.append(reward)
+
+    return q_val, all_final_rewards
 
 
 def save_q_val_function(name, q_func, num_states):
     """
     Function to save q value function obtained after much calculation
     """
+    if not os.path.exists('../saves'):
+        os.makedirs('../saves')
+
     with open('../saves/'+name+'_'+str(int(time.time())), 'w') as file:
         for action in ['hit', 'stick']:
             file.write(action+'\n')
-            for state_num in trange(num_states):
+            for state_num in range(num_states):
                 file.write(str(state_num)+' ' +
                            str(q_func[action][state_num])+'\n')
 
@@ -504,3 +573,52 @@ def average_rewards(arr_rewards):
         avg_rewards[i] /= len(arr_rewards)
 
     return avg_rewards
+
+
+def test_policy(simulator, policy, num_runs):
+    """
+    Test a policy by getting average reward over x runs
+    """
+    tot_reward = 0
+
+    for _ in range(num_runs):
+        state = simulator.reset()
+        done = False
+
+        while not done:
+            score = simulator.get_state_score(state)
+            if score == 31:
+                action = 'stick'
+            else:
+                action = policy[state]
+            state, reward, done = simulator.step(action)
+
+        tot_reward += reward
+
+    return tot_reward/num_runs
+
+
+def test_q_func(simulator, q_func, num_runs):
+    """
+    Test a q function by using it to get greedy policy and averaging reward over x runs.
+    """
+    tot_reward = 0
+
+    for _ in range(num_runs):
+        state = simulator.reset()
+        done = False
+
+        while not done:
+            score = simulator.get_state_score(state)
+            if score == 31:
+                action = 'stick'
+            else:
+                if q_func['hit'][state] >= q_func['stick'][state]:
+                    action = 'hit'
+                else:
+                    action = 'stick'
+            state, reward, done = simulator.step(action)
+
+        tot_reward += reward
+
+    return tot_reward/num_runs
