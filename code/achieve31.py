@@ -309,10 +309,10 @@ def run_mc_q_value(simulator, gamma, visit_type, num_episodes):
         lambda: []), 'stick': defaultdict(lambda: [])}
 
     for _ in range(num_episodes):
-        state_action_pairs, reward = generate_episode_q_value(simulator)
+        state_action_pairs, rewards = generate_episode_q_value(simulator)
         g_val = 0
         for ind, state_action in reversed(list(enumerate(state_action_pairs))):
-            g_val = reward[ind] + gamma * g_val
+            g_val = rewards[ind] + gamma * g_val
             if visit_type == 'every' or (state_action not in state_action_pairs[:ind-1]):
 
                 returns[state_action[1]][state_action[0]].append(g_val)
@@ -622,3 +622,57 @@ def test_q_func(simulator, q_func, num_runs):
         tot_reward += reward
 
     return tot_reward/num_runs
+
+
+def generate_episode_by_epsilon_greeedy_policy(simulator, q_func, epsilon):
+    """
+    Generate episodes according to epsilon greedy policy on q_func
+    """
+    state = simulator.reset()
+    done = False
+    state_action_pairs = []
+
+    while not done:
+        action = epsilon_greedy_sample(q_func, simulator, epsilon, state)
+
+        state_action_pairs.append((state, action))
+
+        state, reward, done = simulator.step(action)
+
+    return state_action_pairs, reward
+
+
+def forward_view_td_lambda(simulator, alpha, lambd, epsilon, gamma, num_episodes):
+    """
+    Run forward view TD(lambda)
+    """
+    q_val = {'hit': defaultdict(lambda: 0), 'stick': defaultdict(lambda: 0)}
+
+    for _ in range(num_episodes):
+        state_action_pairs, reward = generate_episode_by_epsilon_greeedy_policy(
+            simulator, q_val, epsilon)
+
+        t_terminal = len(state_action_pairs)
+
+        for t_actual in range(t_terminal):
+
+            g_t_lambda = 0
+            for n_val in range(1, 1 + t_terminal-t_actual-1):
+                state_action_pair = state_action_pairs[t_actual+n_val]
+                state = state_action_pair[0]
+                action = state_action_pair[1]
+
+                g_t_lambda = (lambd ** (n_val - 1)) * \
+                    (gamma ** n_val) * q_val[action][state]
+            g_t_lambda = (1-lambd)*g_t_lambda + (lambd ** (t_terminal -
+                                                           t_actual - 1)) * (gamma ** (t_terminal-t_actual)) * reward
+
+            state_action_pair = state_action_pairs[t_actual]
+            state = state_action_pair[0]
+            action = state_action_pair[1]
+
+            old_q_val = q_val[action][state]
+
+            q_val[action][state] = old_q_val + alpha * (g_t_lambda - old_q_val)
+
+    return q_val

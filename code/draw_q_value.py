@@ -62,6 +62,20 @@ def load_q_function(filename, num_states):
     return q_func
 
 
+def get_new_plt(title):
+    """
+    Define and return new plot for new figure
+    """
+    fig = plt.figure(num=title)
+    mng = plt.get_current_fig_manager()
+    mng.resize(*mng.window.maxsize())
+    axx = fig.add_subplot(111, projection='3d')
+    axx.set_xlabel('Player Raw Score')
+    axx.set_ylabel('Dealer Card')
+    axx.set_zlabel('Q Value')
+    return axx
+
+
 if __name__ == "__main__":
     FILENAME = sys.argv[1]
 
@@ -70,60 +84,66 @@ if __name__ == "__main__":
 
     Q = load_q_function(FILENAME, NUM_STATES)
 
-    FIG = plt.figure()
-
     FUNC = generate_func(Q, 'hit', 1, 1, 1)
     X, Y, Z = generate_x_y_z(-30, 31, 1, 10, FUNC)
-    AX = FIG.add_subplot(421, projection='3d')
+    # AX = FIG.add_subplot(421, projection='3d')
+    AX = get_new_plt('hit 3 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
                     cmap='viridis', edgecolor='none')
     AX.set_title('Hit - 3 Trumps')
 
     FUNC = generate_func(Q, 'stick', 1, 1, 1)
     X, Y, Z = generate_x_y_z(-6, 31, 1, 10, FUNC)
-    AX = FIG.add_subplot(422, projection='3d')
+    # AX = FIG.add_subplot(422, projection='3d')
+    AX = get_new_plt('stick 3 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
                     cmap='viridis', edgecolor='none')
     AX.set_title('Stick - 3 Trumps')
 
     FUNC = generate_func(Q, 'hit', 1, 1, 0)
     X, Y, Z = generate_x_y_z(-20, 31, 1, 10, FUNC)
-    AX = FIG.add_subplot(423, projection='3d')
+    # AX = FIG.add_subplot(423, projection='3d')
+    AX = get_new_plt('hit 2 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
                     cmap='viridis', edgecolor='none')
     AX.set_title('Hit - 2 Trumps')
 
     FUNC = generate_func(Q, 'stick', 1, 1, 0)
     X, Y, Z = generate_x_y_z(4, 31, 1, 10, FUNC)
-    AX = FIG.add_subplot(424, projection='3d')
+    # AX = FIG.add_subplot(424, projection='3d')
+    AX = get_new_plt('stick 2 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
                     cmap='viridis', edgecolor='none')
     AX.set_title('Stick - 2 Trumps')
 
     FUNC = generate_func(Q, 'hit', 1, 0, 0)
     X, Y, Z = generate_x_y_z(-10, 31, 1, 10, FUNC)
-    AX = FIG.add_subplot(425, projection='3d')
+    # AX = FIG.add_subplot(425, projection='3d')
+    AX = get_new_plt('hit 1 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
                     cmap='viridis', edgecolor='none')
     AX.set_title('Hit - 1 Trumps')
 
     FUNC = generate_func(Q, 'stick', 1, 0, 0)
     X, Y, Z = generate_x_y_z(14, 31, 1, 10, FUNC)
-    AX = FIG.add_subplot(426, projection='3d')
+    # AX = FIG.add_subplot(426, projection='3d')
+    AX = get_new_plt('stick 1 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
                     cmap='viridis', edgecolor='none')
     AX.set_title('Stick - 1 Trumps')
 
     FUNC = generate_func(Q, 'hit', 0, 0, 0)
     X, Y, Z = generate_x_y_z(0, 31, 1, 10, FUNC)
-    AX = FIG.add_subplot(427, projection='3d')
+    # AX = FIG.add_subplot(427, projection='3d')
+    AX = get_new_plt('hit 0 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
                     cmap='viridis', edgecolor='none')
     AX.set_title('Hit - 0 Trumps')
 
     FUNC = generate_func(Q, 'stick', 0, 0, 0)
     X, Y, Z = generate_x_y_z(24, 31, 1, 10, FUNC)
-    AX = FIG.add_subplot(428, projection='3d')
+    # AX = FIG.add_subplot(428, projection='3d')
+    AX = get_new_plt('stick 0 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
                     cmap='viridis', edgecolor='none')
     AX.set_title('Stick - 0 Trumps')
