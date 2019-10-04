@@ -92,7 +92,7 @@ class Simulator():
 
         state_num = 3
         self.encoder = {}
-        # self.decoder = {}
+        self.decoder = {}
         self.decode_score = {}
 
         for total in range(-30, 32):
@@ -111,7 +111,7 @@ class Simulator():
 
                     self.encoder[frozenset(
                         compressed_state.items())] = state_num
-                    # self.decoder[state_num] = constructed_state
+                    self.decoder[state_num] = compressed_state
                     self.decode_score[state_num] = player_score_loc
 
                     state_num += 1
@@ -153,21 +153,21 @@ class Simulator():
 
         return self.decode_score[state_num]
 
-    # def decode(self, state_num):
-    #     """
-    #     Decode input state
-    #     """
+    def decode_compressed(self, state_num):
+        """
+        Decode input state
+        """
 
-    #     if state_num == 0:
-    #         return 'lose'
+        if state_num == 0:
+            return 'lose'
 
-    #     if state_num == 1:
-    #         return 'win'
+        if state_num == 1:
+            return 'win'
 
-    #     if state_num == 2:
-    #         return 'draw'
+        if state_num == 2:
+            return 'draw'
 
-    #     return self.decoder[state_num]
+        return self.decoder[state_num]
 
     def reset(self):
         """
@@ -196,6 +196,21 @@ class Simulator():
 
         # print_card(False, '+', card_num)
         return self.encode(self.state)
+
+    def reset_with_state(self, state_num):
+        """
+        Reset State with passed state and start new game
+        """
+
+        compressed_state = self.decode_compressed(state_num)
+
+        self.state = {
+            'total': compressed_state['total'],
+            'trump1': int(compressed_state['trumps'] > 0),
+            'trump2': int(compressed_state['trumps'] > 1),
+            'trump3': int(compressed_state['trumps'] > 2),
+            'dealer_card': compressed_state['dealer_card']
+        }
 
     def step(self, action_taken):
         """
@@ -396,7 +411,7 @@ def run_k_step_td_q_value(simulator, k, alpha, gamma, num_epis):
     return q_val
 
 
-def k_step_lookahed_sarsa(simulator, k, init_alpha, epsilon, gamma, num_epis, decay=False):
+def k_step_lookahed_sarsa(simulator, k, alpha, init_epsilon, gamma, num_epis, decay=False):
     """
     Simulate k step lookahead SARSA
     """
@@ -405,15 +420,14 @@ def k_step_lookahed_sarsa(simulator, k, init_alpha, epsilon, gamma, num_epis, de
 
     all_final_rewards = []
 
-    num_updates = 0
+    num_updates = 1
+
+    epsilon = init_epsilon
 
     for _ in range(num_epis):
         state = simulator.reset()
 
-        alpha = init_alpha
-
         greedy_action = greedy_pi[state]
-
         action = greedy_action
         if random() < epsilon:
             action = choice(['hit', 'stick'])
@@ -468,10 +482,6 @@ def k_step_lookahed_sarsa(simulator, k, init_alpha, epsilon, gamma, num_epis, de
                 temp_action = actions[t_apparent]
                 old_q = q_val[temp_action][temp_state]
 
-                if decay:
-                    num_updates += 1
-                    alpha = init_alpha / num_updates
-
                 q_val[temp_action][temp_state] = old_q + \
                     alpha * (g_value - old_q)
 
@@ -490,7 +500,12 @@ def k_step_lookahed_sarsa(simulator, k, init_alpha, epsilon, gamma, num_epis, de
             else:
                 t_actual += 1
 
+        # all_final_rewards.append(test_q_func(simulator, q_val, 100))
         all_final_rewards.append(reward)
+
+        if decay:
+            num_updates += 1
+            epsilon = init_epsilon / num_updates
 
     return greedy_pi, all_final_rewards
 
@@ -541,6 +556,7 @@ def q_learning(simulator, alpha, epsilon, gamma, num_epis):
 
             state = next_state
 
+        # all_final_rewards.append(test_q_func(simulator, q_val, 10))
         all_final_rewards.append(reward)
 
     return q_val, all_final_rewards
@@ -598,6 +614,30 @@ def test_policy(simulator, policy, num_runs):
     return tot_reward/num_runs
 
 
+def test_policy_on_starts(simulator, policy, test_starts):
+    """
+    Test a policy by getting average reward over x runs
+    """
+    tot_reward = 0
+
+    for start in test_starts:
+        state = start
+        simulator.reset_with_state(start)
+        done = False
+
+        while not done:
+            score = simulator.get_state_score(state)
+            if score == 31:
+                action = 'stick'
+            else:
+                action = policy[state]
+            state, reward, done = simulator.step(action)
+
+        tot_reward += reward
+
+    return tot_reward/len(test_starts)
+
+
 def test_q_func(simulator, q_func, num_runs):
     """
     Test a q function by using it to get greedy policy and averaging reward over x runs.
@@ -624,6 +664,33 @@ def test_q_func(simulator, q_func, num_runs):
     return tot_reward/num_runs
 
 
+def test_q_func_on_starts(simulator, q_func, test_starts):
+    """
+    Test a q function by using it to get greedy policy and averaging reward over x runs.
+    """
+    tot_reward = 0
+
+    for start in test_starts:
+        state = start
+        simulator.reset_with_state(start)
+        done = False
+
+        while not done:
+            score = simulator.get_state_score(state)
+            if score == 31:
+                action = 'stick'
+            else:
+                if q_func['hit'][state] >= q_func['stick'][state]:
+                    action = 'hit'
+                else:
+                    action = 'stick'
+            state, reward, done = simulator.step(action)
+
+        tot_reward += reward
+
+    return tot_reward/len(test_starts)
+
+
 def generate_episode_by_epsilon_greeedy_policy(simulator, q_func, epsilon):
     """
     Generate episodes according to epsilon greedy policy on q_func
@@ -642,15 +709,28 @@ def generate_episode_by_epsilon_greeedy_policy(simulator, q_func, epsilon):
     return state_action_pairs, reward
 
 
-def forward_view_td_lambda(simulator, alpha, lambd, epsilon, gamma, num_episodes):
+def forward_view_td_lambda(simulator, alpha, lambd, init_epsilon, gamma, num_episodes, init_q_val=None):
     """
     Run forward view TD(lambda)
     """
-    q_val = {'hit': defaultdict(lambda: 0), 'stick': defaultdict(lambda: 0)}
+    if init_q_val is not None:
+        q_val = init_q_val
+    else:
+        q_val = {'hit': defaultdict(
+            lambda: 0), 'stick': defaultdict(lambda: 0)}
+
+    all_rewards = []
+    num_updates = 1
+
+    epsilon = init_epsilon
 
     for _ in range(num_episodes):
+
         state_action_pairs, reward = generate_episode_by_epsilon_greeedy_policy(
             simulator, q_val, epsilon)
+
+        num_updates += 1
+        epsilon = init_epsilon / num_updates
 
         t_terminal = len(state_action_pairs)
 
@@ -675,4 +755,23 @@ def forward_view_td_lambda(simulator, alpha, lambd, epsilon, gamma, num_episodes
 
             q_val[action][state] = old_q_val + alpha * (g_t_lambda - old_q_val)
 
-    return q_val
+        # all_rewards.append(test_q_func(simulator, q_val, 10))
+        all_rewards.append(reward)
+
+    return q_val, all_rewards
+
+
+def load_q_function(filename, num_states):
+    """
+    Load q function from file
+    """
+    q_func = {}
+
+    with open(filename) as file:
+        for _ in range(2):
+            action = file.readline().strip()
+            q_func[action] = {}
+            for i in range(num_states):
+                score = float(file.readline().strip().split()[1])
+                q_func[action][i] = score
+    return q_func

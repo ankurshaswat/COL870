@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits import mplot3d
 
-from achieve31 import Simulator
+from achieve31 import Simulator, load_q_function
 
 
 def generate_func(q_loc, action_loc, t1_val, t2_val, t3_val):
@@ -46,22 +46,6 @@ def generate_x_y_z(x_start, x_end, y_start, y_end, func):
     return x_mesh, y_mesh, z_mesh
 
 
-def load_q_function(filename, num_states):
-    """
-    Load q function from file
-    """
-    q_func = {}
-
-    with open(filename) as file:
-        for _ in range(2):
-            action = file.readline().strip()
-            q_func[action] = {}
-            for i in range(num_states):
-                score = float(file.readline().strip().split()[1])
-                q_func[action][i] = score
-    return q_func
-
-
 def get_new_plt(title):
     """
     Define and return new plot for new figure
@@ -93,7 +77,7 @@ if __name__ == "__main__":
     AX.set_title('Hit - 3 Trumps')
 
     FUNC = generate_func(Q, 'stick', 1, 1, 1)
-    X, Y, Z = generate_x_y_z(-6, 31, 1, 10, FUNC)
+    X, Y, Z = generate_x_y_z(-30, 31, 1, 10, FUNC)
     # AX = FIG.add_subplot(422, projection='3d')
     AX = get_new_plt('stick 3 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
@@ -109,7 +93,7 @@ if __name__ == "__main__":
     AX.set_title('Hit - 2 Trumps')
 
     FUNC = generate_func(Q, 'stick', 1, 1, 0)
-    X, Y, Z = generate_x_y_z(4, 31, 1, 10, FUNC)
+    X, Y, Z = generate_x_y_z(-20, 31, 1, 10, FUNC)
     # AX = FIG.add_subplot(424, projection='3d')
     AX = get_new_plt('stick 2 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
@@ -125,7 +109,7 @@ if __name__ == "__main__":
     AX.set_title('Hit - 1 Trumps')
 
     FUNC = generate_func(Q, 'stick', 1, 0, 0)
-    X, Y, Z = generate_x_y_z(14, 31, 1, 10, FUNC)
+    X, Y, Z = generate_x_y_z(-10, 31, 1, 10, FUNC)
     # AX = FIG.add_subplot(426, projection='3d')
     AX = get_new_plt('stick 1 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
@@ -141,7 +125,7 @@ if __name__ == "__main__":
     AX.set_title('Hit - 0 Trumps')
 
     FUNC = generate_func(Q, 'stick', 0, 0, 0)
-    X, Y, Z = generate_x_y_z(24, 31, 1, 10, FUNC)
+    X, Y, Z = generate_x_y_z(0, 31, 1, 10, FUNC)
     # AX = FIG.add_subplot(428, projection='3d')
     AX = get_new_plt('stick 0 trump')
     AX.plot_surface(X, Y, Z, rstride=1, cstride=1,
